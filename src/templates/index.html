@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🌾 Crop Yield Prediction </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #748390, #062a2c);
+      margin: 0; padding: 0;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+      padding: 40px 30px;
+      width: 420px;
+      color: #876e6e;
+      text-align: center;
+    }
+    h2 { font-size: 26px; margin-bottom: 25px; color: #fff; text-shadow: 1px 1px 4px rgba(0,0,0,0.3); }
+    label { font-weight: 500; text-align: left; display: block; margin-top: 15px; color: #f0f0f0; }
+    input {
+      width: 100%; padding: 10px 12px; margin-top: 6px;
+      border: none; border-radius: 10px; background: rgba(255,255,255,0.2);
+      color: #fff; outline: none; font-size: 15px; transition: 0.3s;
+    }
+    input:focus { background: rgba(255,255,255,0.35); }
+    button {
+      background: linear-gradient(135deg, #43cea2, #185a9d);
+      color: white; border: none; padding: 12px; width: 100%;
+      margin-top: 25px; border-radius: 10px; font-size: 17px;
+      cursor: pointer; transition: 0.3s; font-weight: 600;
+    }
+    button:hover { background: linear-gradient(135deg, #3cba92, #0074e4); transform: translateY(-2px); }
+    #result {
+      background: rgba(255,255,255,0.15);
+      border-radius: 12px; padding: 15px; margin-top: 20px;
+      font-size: 16px; color: #f9f9f9; line-height: 1.6;
+      display: none; transition: all 0.3s ease;
+    }
+    ::placeholder { color: rgba(255,255,255,0.7); }
+    @media (max-width: 480px) { .container { width: 90%; padding: 25px; } h2 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🌾 Crop Yield Prediction </h2>
+
+    <label for="location">Location</label>
+    <input type="text" id="location" placeholder="Enter city (e.g., Vijayawada)" required onblur="getLiveTemperature()">
+
+    <label for="temperature">Live Temperature (°C)</label>
+    <input type="text" id="temperature" placeholder="Auto-filled" readonly>
+
+    <label for="area">Area</label>
+    <input type="text" id="area" placeholder="Enter area (e.g., India)" required>
+
+    <label for="item">Crop Item</label>
+    <input type="text" id="item" placeholder="Enter crop name (e.g., Rice)" required>
+
+    <label for="year">Year</label>
+    <input type="number" id="year" placeholder="e.g., 2024" required>
+
+    <label for="rainfall">Average Rainfall (mm/year)</label>
+    <input type="number" id="rainfall" placeholder="e.g., 1000" required>
+
+    <label for="pesticides">Pesticides (tonnes)</label>
+    <input type="number" id="pesticides" placeholder="e.g., 500" required>
+
+    <button onclick="getPrediction()">🔍 Predict Yield</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    async function getLiveTemperature() {
+      const location = document.getElementById("location").value.trim();
+      const tempField = document.getElementById("temperature");
+
+      if (!location) return;
+      tempField.value = "Fetching...";
+
+      try {
+        const response = await fetch(`/get_temperature?location=${location}`);
+        const data = await response.json();
+
+        if (response.ok && data.temperature) {
+          tempField.value = data.temperature + " °C";
+        } else {
+          tempField.value = "Not Found";
+          alert(`⚠️ Could not fetch weather data for ${location}\nReason: ${data.error || "Unknown"}`);
+        }
+      } catch (err) {
+        tempField.value = "Error";
+        alert("⚠️ Error fetching weather data: " + err);
+      }
+    }
+
+    async function getPrediction() {
+      const location = document.getElementById("location").value;
+      const tempValue = document.getElementById("temperature").value.replace(" °C", "");
+      const area = document.getElementById("area").value;
+      const item = document.getElementById("item").value;
+      const year = document.getElementById("year").value;
+      const rainfall = document.getElementById("rainfall").value;
+      const pesticides = document.getElementById("pesticides").value;
+
+      if (!location || !area || !item || !year || !rainfall || !pesticides || tempValue === "" || tempValue === "Not Found") {
+        alert("⚠️ Please fill all fields and fetch temperature first!");
+        return;
+      }
+
+      document.getElementById("result").style.display = "block";
+      document.getElementById("result").innerHTML = "Predicting... ⏳";
+
+      const response = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Location: location,
+          Area: area,
+          Item: item,
+          Year: year,
+          average_rain_fall_mm_per_year: rainfall,
+          pesticides_tonnes: pesticides,
+          avg_temp: tempValue
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        document.getElementById("result").innerHTML = `❌ Error: ${result.error}`;
+      } else {
+        document.getElementById("result").innerHTML = `
+          ✅ <b>Predicted Yield:</b> ${result.predicted_yield} kg/ha<br>
+          🌡️ <b>Temperature:</b> ${result.live_temperature} °C<br>
+          📍 <b>Location:</b> ${result.location}<br><br>
+          💡 <b>AI Suggestion:</b><br>
+          <div style="text-align:left; margin-top:10px; line-height:1.7;">
+            ${result.ai_suggestion.replace(/\n/g, "<br>")}
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
